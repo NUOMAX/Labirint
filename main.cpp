@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <windows.h>
+#include <conio.h>
 
 int main()
 {
@@ -67,6 +68,8 @@ int main()
                 Labir[i][j] = 1;
             if((Labir[i][j] == 0) && ((Labir[i-1][j] && Labir[i][j+1] && Labir[i][j-1] && Labir[i+1][j] && Labir[i+1][j-1]) == 1))
                 Labir[i][j] = 1;
+            if((Labir[i][j] == 1) && (Labir[i][j+1] == 0) && (Labir[i+1][j] == 0) && (Labir[i+1][j+1] == 1))
+                Labir[i+1][j+1] = 0;
         }
     }
     for(int i=0;i<5;i++)//начальная локация
@@ -98,7 +101,7 @@ int main()
         }
     }
     Labir[Y][X] = 2;
-    for(int i=0;i<n;i++) //Ходьба вверх\вниз
+    /*for(int i=0;i<n;i++) //Ходьба вверх\вниз
     {
         for(int j=0;j<m;j++)
         {
@@ -121,8 +124,8 @@ int main()
         }
         std::cout<<"\n";
     }
-    std::cout<<"\n\n\n\n";
-    for(int i=0;i<n;i++)
+    /*std::cout<<"\n\n\n\n";
+     for(int i=0;i<n;i++)
     {
         for(int j=0;j<m;j++)
         {
@@ -130,7 +133,7 @@ int main()
         }
         std::cout<<"\n";
     }
-    for(int j=0;j<n;j++) //Ходьба влево\вправо
+      for(int j=0;j<n;j++) //Ходьба влево\вправо
     {
         for(int i=0;i<m;i++)
         {
@@ -152,7 +155,67 @@ int main()
             }
         }
         std::cout<<"\n";
+    }*/
+    //std::cout<<"\n\n\n\n";
+char c;
+int S = 2, H = n - 3;
+
+while(c != ' ')
+{
+    system("cls");
+    for(int i = S-4; i < S+4; i++)
+    {
+        for(int j = H-6; j < H+6; j++)
+        {
+            if(i == S && j == H)
+            {
+                std::cout << "TT";
+            }
+            else
+            {
+                if(Labir[i][j] == 0)
+                    std::cout << "░░";
+                /*else
+                {
+                    if((Labir[i][j+1] == 0 || Labir[i+1][j] == 0 || Labir[i+1][j+1] == 0) && Labir[i][j] == 1)
+                        std::cout << "▓▓";
+                    else
+                        std::cout << "██";
+                }*/
+                if(Labir[i][j] == 1)
+                     std::cout << "██";
+            }
+        }
+        std::cout << "\n"; // замените на std::endl для сброса буфера
     }
-    std::cout<<"\n\n\n\n";
+
+    // Принудительно сбросить буфер вывода
+    std::cout << std::flush;
+
+    c = _getch();
+    switch(c)
+    {
+   case 'w':
+       if(Labir[S-1][H] == 1 || S<0)
+        break;
+       S--;
+       break;
+   case 's':
+       if(Labir[S+1][H] == 1 || S>n)
+        break;
+       S++;
+       break;
+   case 'a':
+       if(Labir[S][H-1] == 1 || H<0)
+        break;
+       H--;
+       break;
+   case 'd':
+       if(Labir[S][H+1] == 1 || H>m)
+        break;
+       H++;
+       break;
+    }
+}
     return 0;
 }
