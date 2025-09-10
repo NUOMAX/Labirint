@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1757460163 source:c:\users\max\desktop\cpp\labirint\main.cpp
+1757507527 source:c:\users\max\desktop\cpp\labirint\main.cpp
 	<iostream>
 	<cstdlib>
 	<windows.h>

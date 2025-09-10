@@ -70,6 +70,8 @@ int main()
                 Labir[i][j] = 1;
             if((Labir[i][j] == 1) && (Labir[i][j+1] == 0) && (Labir[i+1][j] == 0) && (Labir[i+1][j+1] == 1))
                 Labir[i+1][j+1] = 0;
+            if((Labir[i][j] == 0) && (Labir[i][j+1] == 1) && (Labir[i+1][j] == 1) && (Labir[i+1][j+1] == 0))
+                Labir[i][j+1] = 0;
         }
     }
     for(int i=0;i<5;i++)//начальная локация
@@ -175,6 +177,8 @@ while(c != ' ')
             {
                 if(Labir[i][j] == 0)
                     std::cout << "░░";
+                else
+                {
                 /*else
                 {
                     if((Labir[i][j+1] == 0 || Labir[i+1][j] == 0 || Labir[i+1][j+1] == 0) && Labir[i][j] == 1)
@@ -182,36 +186,54 @@ while(c != ' ')
                     else
                         std::cout << "██";
                 }*/
-                if(Labir[i][j] == 1)
-                     std::cout << "██";
+                if(Labir[i][j+1] == 0)
+                     std::cout << "█▓";
+                else
+                {
+                    if(Labir[i][j-1] == 0)
+                    std::cout<<"░█";
+                    else
+                    {
+                      if((Labir[i+1][j] == 0 || Labir[i-1][j] == 0 || (Labir[i+1][j] == 0 || Labir[i-1][j] == 0) || (Labir[i][j-1] == 0 || Labir[i][j+1] == 0)) && Labir[i][j-1] != 1)
+                        std::cout<<"▓▓";
+                      else
+                      {
+                            if(Labir[i][j] == 2)
+                                std::cout<<"++";
+                            else
+                                std::cout<<"██";
+                      }
+                    }
+                }
+                }
+
             }
         }
-        std::cout << "\n"; // замените на std::endl для сброса буфера
+        std::cout << "\n";
     }
-
-    // Принудительно сбросить буфер вывода
+    std::cout<<"\n Y="<<S<<" X="<<H;
     std::cout << std::flush;
 
     c = _getch();
     switch(c)
     {
    case 'w':
-       if(Labir[S-1][H] == 1 || S<0)
+       if(Labir[S-1][H] == 1 || S<=0)
         break;
        S--;
        break;
    case 's':
-       if(Labir[S+1][H] == 1 || S>n)
+       if(Labir[S+1][H] == 1 || S>=n)
         break;
        S++;
        break;
    case 'a':
-       if(Labir[S][H-1] == 1 || H<0)
+       if(Labir[S][H-1] == 1 || H<=0)
         break;
        H--;
        break;
    case 'd':
-       if(Labir[S][H+1] == 1 || H>m)
+       if(Labir[S][H+1] == 1 || H>=m)
         break;
        H++;
        break;

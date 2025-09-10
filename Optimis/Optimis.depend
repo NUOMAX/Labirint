@@ -1,0 +1,13 @@
+# depslib dependency file v1.0
+1757513655 source:c:\users\max\desktop\cpp\dipsikoptimis\main.cpp
+	<iostream>
+	<cstdlib>
+	<windows.h>
+	<conio.h>
+
+1757515935 source:c:\users\max\desktop\cpp\optimis\main.cpp
+	<iostream>
+	<cstdlib>
+	<windows.h>
+	<conio.h>
+
