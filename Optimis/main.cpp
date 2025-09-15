@@ -1,9 +1,11 @@
 #include <iostream>
 #include <cstdlib>
-#include <windows.h>
 #include <conio.h>
+#include <windows.h>
+#include "gEneraTor.h"
 
-void SetConsole() {
+void SetConsole()
+{
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_CURSOR_INFO cursorInfo;
     GetConsoleCursorInfo(hConsole, &cursorInfo);
@@ -13,9 +15,9 @@ void SetConsole() {
     SetConsoleCP(CP_UTF8);
 }
 
-inline bool inBounds(int i, int j, int n, int m)
+inline Generator()
 {
-    return i >= 0 && i < n && j >= 0 && j < m;
+
 }
 
 int main()
@@ -23,7 +25,6 @@ int main()
     std::ios_base::sync_with_stdio(false);
     std::cout.tie(nullptr);
     SetConsole();
-
     int n, m;
     long long SEED;
     std::cout <<"Введите размер мира N x M:::::::::::jvgwjegvegvyewvweejk \n";
@@ -43,86 +44,7 @@ int main()
             Labir[i][j] = rand() % 10;
         }
     }
-    for (int i = 0; i < n; i++)
-    {
-        for (int j = 0; j < m; j++)
-        {
-            int left = (j > 0) ? Labir[i][j-1] : 0;
-            if ((left + Labir[i][j]) >= 7)
-            {
-                Labir[i][j] = 0;
-            } else {
-                Labir[i][j] = 1;
-            }
-        }
-    }
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < m; j++) {
-            if (inBounds(i, j, n, m) && inBounds(i+2, j, n, m) && inBounds(i, j+2, n, m) && inBounds(i+1, j, n, m) && inBounds(i+1, j+1, n, m))
-            {
-                int sum = Labir[i][j] + Labir[i][j+1] + Labir[i][j+2] + Labir[i+1][j] + Labir[i+1][j+1] + Labir[i+2][j];
-                if (sum >= 4)
-                {
-                    Labir[i][j] = 0;
-                } else {
-                    Labir[i][j] = 1;
-                }
-            }
-        }
-    }
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < m; j++) {
-            if (inBounds(i-1, j-1, n, m) && inBounds(i-1, j+1, n, m) && inBounds(i+1, j-1, n, m) && inBounds(i+1, j, n, m))
-                {
-                int count = Labir[i-1][j] + Labir[i-1][j-1] + Labir[i-1][j+1] + Labir[i][j-1] + Labir[i][j+1] + Labir[i+1][j] + Labir[i+1][j-1] + Labir[i][j];
-                if (count <= 1)
-                {
-                    Labir[i][j] = 0;
-                }
-                if (Labir[i][j+1] && Labir[i-1][j] == 1)
-                {
-                    Labir[i][j+1] = 0;
-                } else {
-                    if (Labir[i][j] && Labir[i+1][j+1] == 1)
-                    {
-                        Labir[i][j] = 0;
-                    }
-                }
-
-                if (Labir[i][j] == 0)
-                    {
-                    int neighbors = (inBounds(i-1, j, n, m) ? Labir[i-1][j] : 0) + (inBounds(i, j+1, n, m) ? Labir[i][j+1] : 0) + (inBounds(i, j-1, n, m) ? Labir[i][j-1] : 0) + (inBounds(i+1, j, n, m) ? Labir[i+1][j] : 0);
-                    if (neighbors == 4)
-                    {
-                        Labir[i][j] = 1;
-                    }
-
-                    neighbors += (inBounds(i+1, j-1, n, m) ? Labir[i+1][j-1] : 0);
-                    if (neighbors == 5)
-                    {
-                        Labir[i][j] = 1;
-                    }
-                }
-
-                if (Labir[i][j] == 1 && inBounds(i, j+1, n, m) && Labir[i][j+1] == 0 && inBounds(i+1, j, n, m) && Labir[i+1][j] == 0 && inBounds(i+1, j+1, n, m) && Labir[i+1][j+1] == 1)
-                {
-                    Labir[i+1][j+1] = 0;
-                }
-
-                if (Labir[i][j] == 0 && inBounds(i, j+1, n, m) && Labir[i][j+1] == 1 && inBounds(i+1, j, n, m) && Labir[i+1][j] == 1 && inBounds(i+1, j+1, n, m) && Labir[i+1][j+1] == 0)
-                {
-                    Labir[i][j+1] = 0;
-                }
-            }
-        }
-    }
-    for (int i = 0; i < 5; i++)
-    {
-        for (int j = m-5; j < m; j++)
-        {
-            if (inBounds(i, j, n, m)) Labir[i][j] = 0;
-        }
-    }
+    Gene(Labir, n, m);
     int X = 0, Y = 0;
     bool found = false;
     srand(time(NULL));
@@ -146,7 +68,7 @@ int main()
     }
     Labir[Y][X] = 2;
     int playerY = n - 3, playerX = 2;
-    char c;
+    wchar_t c;
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 
     while (true)
@@ -195,7 +117,7 @@ int main()
             break;
         }
         std::cout.flush();
-        c = _getch();
+        c = _getwch();
         if (c == ' ') break;
 
         int newY = playerY, newX = playerX;

@@ -11,9 +11,21 @@
 	<windows.h>
 	<conio.h>
 
-1757943953 source:c:\users\max\desktop\cpp\labirint\optimis\main.cpp
+1757950642 source:c:\users\max\desktop\cpp\labirint\optimis\main.cpp
 	<iostream>
 	<cstdlib>
-	<windows.h>
 	<conio.h>
+	<windows.h>
+	"gEneraTor.h"
+
+1757948466 source:c:\users\max\desktop\cpp\labirint\optimis\genereted.c
+
+1757949172 source:c:\users\max\desktop\cpp\labirint\optimis\generator.cpp
+
+1757949243 source:c:\users\max\desktop\cpp\labirint\optimis\wwwttt.cpp
+
+1757949429 c:\users\max\desktop\cpp\labirint\optimis\generator.cpp
+	<iostream>
+
+1757950576 c:\users\max\desktop\cpp\labirint\optimis\generator.h
 
