@@ -20,15 +20,13 @@ inline bool inBounds(int i, int j, int n, int m)
 
 int main()
 {
-    SetConsoleCP(1251);
-    SetConsoleOutputCP(1251);
     std::ios_base::sync_with_stdio(false);
     std::cout.tie(nullptr);
     SetConsole();
 
     int n, m;
     long long SEED;
-    std::cout <<"Введите размер мира N x M: \n";
+    std::cout <<"Введите размер мира N x M:::::::::::jvgwjegvegvyewvweejk \n";
     std::cin >> n >> m;
     std::cout << "Пожалуйста, введите сид: \n";
     std::cin >> SEED;
@@ -62,8 +60,7 @@ int main()
         for (int j = 0; j < m; j++) {
             if (inBounds(i, j, n, m) && inBounds(i+2, j, n, m) && inBounds(i, j+2, n, m) && inBounds(i+1, j, n, m) && inBounds(i+1, j+1, n, m))
             {
-                int sum = Labir[i][j] + Labir[i][j+1] + Labir[i][j+2] +
-                         Labir[i+1][j] + Labir[i+1][j+1] + Labir[i+2][j];
+                int sum = Labir[i][j] + Labir[i][j+1] + Labir[i][j+2] + Labir[i+1][j] + Labir[i+1][j+1] + Labir[i+2][j];
                 if (sum >= 4)
                 {
                     Labir[i][j] = 0;
@@ -75,13 +72,9 @@ int main()
     }
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < m; j++) {
-            if (inBounds(i-1, j-1, n, m) && inBounds(i-1, j+1, n, m) &&
-                inBounds(i+1, j-1, n, m) && inBounds(i+1, j, n, m))
+            if (inBounds(i-1, j-1, n, m) && inBounds(i-1, j+1, n, m) && inBounds(i+1, j-1, n, m) && inBounds(i+1, j, n, m))
                 {
-
-                int count = Labir[i-1][j] + Labir[i-1][j-1] + Labir[i-1][j+1] +
-                           Labir[i][j-1] + Labir[i][j+1] + Labir[i+1][j] +
-                           Labir[i+1][j-1] + Labir[i][j];
+                int count = Labir[i-1][j] + Labir[i-1][j-1] + Labir[i-1][j+1] + Labir[i][j-1] + Labir[i][j+1] + Labir[i+1][j] + Labir[i+1][j-1] + Labir[i][j];
                 if (count <= 1)
                 {
                     Labir[i][j] = 0;
@@ -98,10 +91,7 @@ int main()
 
                 if (Labir[i][j] == 0)
                     {
-                    int neighbors = (inBounds(i-1, j, n, m) ? Labir[i-1][j] : 0) +
-                                  (inBounds(i, j+1, n, m) ? Labir[i][j+1] : 0) +
-                                  (inBounds(i, j-1, n, m) ? Labir[i][j-1] : 0) +
-                                  (inBounds(i+1, j, n, m) ? Labir[i+1][j] : 0);
+                    int neighbors = (inBounds(i-1, j, n, m) ? Labir[i-1][j] : 0) + (inBounds(i, j+1, n, m) ? Labir[i][j+1] : 0) + (inBounds(i, j-1, n, m) ? Labir[i][j-1] : 0) + (inBounds(i+1, j, n, m) ? Labir[i+1][j] : 0);
                     if (neighbors == 4)
                     {
                         Labir[i][j] = 1;
@@ -198,7 +188,7 @@ int main()
             }
             std::cout << "\n";
         }
-        std::cout << "\n Y=" << playerY << " X=" << playerX;
+        std::cout << "\n Y=" << playerY << " X=" << playerX<<"  ";
         if(Labir[playerY][playerX] == 2)
         {
             std::cout<<"\n\n\n Cпасибо за игру! :) \n\n\n";
