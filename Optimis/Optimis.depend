@@ -11,12 +11,13 @@
 	<windows.h>
 	<conio.h>
 
-1758365958 source:c:\users\max\desktop\cpp\labirint\optimis\main.cpp
+1758471812 source:c:\users\max\desktop\cpp\labirint\optimis\main.cpp
 	<iostream>
 	<cstdlib>
 	<conio.h>
 	<windows.h>
 	"gEneraTor.h"
+	"VisualMaping.h"
 
 1757948466 source:c:\users\max\desktop\cpp\labirint\optimis\genereted.c
 
@@ -27,5 +28,7 @@
 1757949429 c:\users\max\desktop\cpp\labirint\optimis\generator.cpp
 	<iostream>
 
-1758365433 c:\users\max\desktop\cpp\labirint\optimis\generator.h
+1758472176 c:\users\max\desktop\cpp\labirint\optimis\generator.h
+
+1758472418 c:\users\max\desktop\cpp\labirint\optimis\visualmaping.h
 

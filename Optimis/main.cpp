@@ -3,6 +3,7 @@
 #include <conio.h>
 #include <windows.h>
 #include "gEneraTor.h"
+#include "VisualMaping.h"
 
 void SetConsole()
 {
@@ -22,7 +23,7 @@ int main()
     SetConsole();
     int n, m;
     long long SEED;
-    std::cout <<"Введите размер мира N x M:::::::::::jvgwjegvegvyewvweejk \n";
+    std::cout <<"Введите размер мира N x M: \n";
     std::cin >> n >> m;
     std::cout << "Пожалуйста, введите сид: \n";
     std::cin >> SEED;
@@ -41,11 +42,13 @@ int main()
     }
     int X = 0, Y = 0;
     GeneratorMap(Labir, n, m, X, Y);
-    Labir[Y][X] = 2;
     int playerY = n - 3, playerX = 2;
     wchar_t c;
     VisualMap(playerX, playerY, n, m, Labir, c);
-    delete[] Labir;
+
+    for (int i = 0; i < n; ++i) {
+        delete[] Labir[i];
+    }
 
     return 0;
 }
