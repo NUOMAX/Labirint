@@ -1,408 +1,711 @@
 #ifndef VISUALMAPING_H_INCLUDED
 #define VISUALMAPING_H_INCLUDED
 
+#include <cmath>
+#include <string>
+#include <algorithm>
+#include <windows.h>
+
+// Предварительные объявления функций рисования
 void DrawWall(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant);
-void DrawFloor(HDC hdc, int x, int y, int size, COLORREF color);
+void DrawFloor(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant);
 void DrawPlayer(HDC hdc, int x, int y, int size, COLORREF color);
 void DrawExit(HDC hdc, int x, int y, int size, COLORREF color);
+void DrawWater(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant);
+void DrawCaveFloor(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant);
+void DrawCaveWall(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant);
+void DrawMountain(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant);
+void DrawDesertFloor(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant);
+void DrawDesertWall(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant);
+void DrawExitPoint(HDC hdc, int x, int y, int size, COLORREF color);
 
-void VisualMap(int playerX, int playerY, int n, int m, int** Labir, wchar_t c)
-{
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    HWND HConsole = GetConsoleWindow();
 
+
+// Оптимизированная функция хэширования
+inline unsigned int textureHash(int x, int y, int variant) {
+    return (x * 73856093) ^ (y * 19349663) ^ (variant * 83492791);
+}
+
+// Оптимизированная функция псевдослучайных чисел
+inline int textureRand(unsigned int &seed) {
+    seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF;
+    return seed;
+}
+
+// Структура для хранения ресурсов
+struct GraphicsResources {
+    HDC hdc;
+    HDC hdcBuffer;
+    HBITMAP hBitmap;
+    HFONT hFont;
+    HBRUSH hBackgroundBrush;
+    HBRUSH hFogBrush;
     RECT consoleRect;
-    GetWindowRect(HConsole, &consoleRect);
+};
 
-    MoveWindow(HConsole, consoleRect.left, consoleRect.top, 1000, 1000, TRUE);
+// Функция для освобождения ресурсов
+void CleanupResources(GraphicsResources& res) {
+    if (res.hFont) DeleteObject(res.hFont);
+    if (res.hBitmap) DeleteObject(res.hBitmap);
+    if (res.hdcBuffer) DeleteDC(res.hdcBuffer);
+    if (res.hBackgroundBrush) DeleteObject(res.hBackgroundBrush);
+    if (res.hFogBrush) DeleteObject(res.hFogBrush);
+    if (res.hdc) ReleaseDC(GetConsoleWindow(), res.hdc);
+}
+
+// Функция для рисования тумана
+void DrawFog(HDC hdc, int x, int y, int size, double distance, int viewRadius, COLORREF fogColor) {
+    int alpha = std::min(200, static_cast<int>((distance - viewRadius) / 2));
+    COLORREF fogWithAlpha = RGB(
+        GetRValue(fogColor),
+        GetGValue(fogColor),
+        GetBValue(fogColor)
+    );
+    HBRUSH tempFogBrush = CreateSolidBrush(fogWithAlpha);
+    HBRUSH oldBrush = static_cast<HBRUSH>(SelectObject(hdc, tempFogBrush));
+    HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, GetStockObject(NULL_PEN)));
+
+    Rectangle(hdc, x, y, x + size, y + size);
+
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
+    DeleteObject(tempFogBrush);
+}
+
+// Функция для обработки ввода
+bool ProcessInput(wchar_t& c, int& playerX, int& playerY, int n, int m, int** Labir, bool& exitRequested) {
+    if (!_kbhit()) return false;
+
+    c = _getwch();
+    if (c == ' ') {
+        exitRequested = true;
+        return true;
+    }
+
+    if (Labir[playerY][playerX] == 3) return false;
+
+    int newY = playerY, newX = playerX;
+    switch (c) {
+        case 'w': case 'W': newY--; break;
+        case 's': case 'S': newY++; break;
+        case 'a': case 'A': newX--; break;
+        case 'd': case 'D': newX++; break;
+        default: return false;
+    }
+
+    if (inBounds(newY, newX, n, m) &&
+        Labir[newY][newX] != 1 &&
+        Labir[newY][newX] != 6 &&
+        Labir[newY][newX] != 7 &&
+        Labir[newY][newX] != 9) {
+        playerY = newY;
+        playerX = newX;
+        return true;
+    }
+
+    return false;
+}
+
+// Основная функция визуализации
+void VisualMap(int playerX, int playerY, int n, int m, int** Labir, wchar_t c) {
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    HWND hConsoleWnd = GetConsoleWindow();
 
     Sleep(100);
 
-    HDC hdc = GetDC(HConsole);
+    GraphicsResources res{};
+    res.hdc = GetDC(hConsoleWnd);
+    res.hdcBuffer = CreateCompatibleDC(res.hdc);
 
-    HDC hdcBuffer = CreateCompatibleDC(hdc);
-    GetClientRect(HConsole, &consoleRect);
-    HBITMAP hBitmap = CreateCompatibleBitmap(hdc, consoleRect.right, consoleRect.bottom);
-    SelectObject(hdcBuffer, hBitmap);
+    GetClientRect(hConsoleWnd, &res.consoleRect);
+    res.hBitmap = CreateCompatibleBitmap(res.hdc, res.consoleRect.right, res.consoleRect.bottom);
+    SelectObject(res.hdcBuffer, res.hBitmap);
 
-    HFONT hFont = CreateFontA(28, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
-    DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-    DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, "Consolas");
-    SelectObject(hdcBuffer, hFont);
-    SetTextColor(hdcBuffer, RGB(255, 255, 200));
-    SetBkColor(hdcBuffer, RGB(0, 0, 0));
+    // Настройка шрифта
+    res.hFont = CreateFontA(28, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, "Consolas");
+    SelectObject(res.hdcBuffer, res.hFont);
+    SetTextColor(res.hdcBuffer, RGB(255, 255, 200));
+    SetBkColor(res.hdcBuffer, RGB(0, 0, 0));
 
-    const int TILE_SIZE = 120;
+    const int TILE_SIZE = 60;
+    const int viewRadius = 600;
+    const int screenWidth = res.consoleRect.right;
+    const int screenHeight = res.consoleRect.bottom;
+    const int centerX = screenWidth / 2;
+    const int centerY = screenHeight / 2;
 
-    COLORREF wallColor = RGB(88, 72, 56);
-    COLORREF floorColor = RGB(64, 56, 48);
-    COLORREF darkWallColor = RGB(64, 52, 40);
-    COLORREF playerColor = RGB(255, 200, 100);
-    COLORREF exitColor = RGB(200, 80, 80);
+    // Цвета
+    const COLORREF wallColor = RGB(88, 72, 56);
+    const COLORREF floorColor = RGB(64, 56, 48);
+    const COLORREF darkWallColor = RGB(64, 52, 40);
+    const COLORREF playerColor = RGB(255, 200, 100);
+    const COLORREF exitColor = RGB(200, 80, 80);
+    const COLORREF fogColor = RGB(30, 30, 40);
 
-    HBRUSH hBackgroundBrush = CreateSolidBrush(RGB(16, 12, 24));
-
-    int screenWidth = consoleRect.right;
-    int screenHeight = consoleRect.bottom;
+    res.hBackgroundBrush = CreateSolidBrush(RGB(16, 12, 24));
+    res.hFogBrush = CreateSolidBrush(fogColor);
 
     bool firstFrame = true;
+    bool exitRequested = false;
+    const int viewRadiusSquared = viewRadius * viewRadius;
 
-    while (true)
-    {
-        FillRect(hdcBuffer, &consoleRect, hBackgroundBrush);
+    // Основной цикл рендеринга
+    while (!exitRequested) {
+        FillRect(res.hdcBuffer, &res.consoleRect, res.hBackgroundBrush);
 
-        int centerX = screenWidth / 2;
-        int centerY = screenHeight / 2;
-        int viewRadius = 400;
-
-        for (int i = playerY - 10; i <= playerY + 10; i++)
-        {
-            for (int j = playerX - 10; j <= playerX + 10; j++)
-            {
+        // Рендеринг карты
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < m; j++) {
                 int tileX = centerX + (j - playerX) * TILE_SIZE;
                 int tileY = centerY + (i - playerY) * TILE_SIZE;
 
-                int dx = tileX - centerX;
-                int dy = tileY - centerY;
-                if (dx*dx + dy*dy > viewRadius*viewRadius) {
-                    continue;
-                }
-
+                // Отсечение невидимых тайлов
                 if (tileX < -TILE_SIZE || tileX > screenWidth ||
                     tileY < -TILE_SIZE || tileY > screenHeight) {
                     continue;
                 }
 
-                if (!inBounds(i, j, n, m))
-                {
-                    DrawWall(hdcBuffer, tileX, tileY, TILE_SIZE, darkWallColor, j, i, (i+j) % 8);
+                // Проверка расстояния до центра
+                int dx = tileX - centerX;
+                int dy = tileY - centerY;
+                int distanceSquared = dx * dx + dy * dy;
+
+                if (distanceSquared > viewRadiusSquared) {
+                    double distance = sqrt(static_cast<double>(distanceSquared));
+                    DrawFog(res.hdcBuffer, tileX, tileY, TILE_SIZE, distance, viewRadius, fogColor);
                     continue;
                 }
 
-                if (Labir[i][j] == 0)
-                {
-                    DrawFloor(hdcBuffer, tileX, tileY, TILE_SIZE, floorColor);
-                    //DrawShadow(hdcBuffer, tileX, tileY, TILE_SIZE);
+                // Рендеринг видимых тайлов
+                if (!inBounds(i, j, n, m)) {
+                    DrawWall(res.hdcBuffer, tileX, tileY, TILE_SIZE, darkWallColor, j, i, (i + j) % 8);
+                    continue;
                 }
-                else if (Labir[i][j] == 2)
-                {
-                    DrawFloor(hdcBuffer, tileX, tileY, TILE_SIZE, floorColor);
-                    DrawExit(hdcBuffer, tileX, tileY, TILE_SIZE, exitColor);
-                }
-                else
-                {
-                    int variant = (i * 7 + j * 13) % 8;
-                    DrawWall(hdcBuffer, tileX, tileY, TILE_SIZE, wallColor, j, i, variant);
+
+                // Оптимизированный switch по типам блоков
+                switch (Labir[i][j]) {
+                    case 0:
+                    case 2:
+                        DrawFloor(res.hdcBuffer, tileX, tileY, TILE_SIZE, darkWallColor, j, i, (i + j) % 8);
+                        break;
+                    case 3:
+                        DrawFloor(res.hdcBuffer, tileX, tileY, TILE_SIZE, darkWallColor, j, i, (i + j) % 8);
+                        DrawExitPoint(res.hdcBuffer, tileX, tileY, TILE_SIZE, exitColor);
+                        break;
+                    case 4:
+                        DrawWater(res.hdcBuffer, tileX, tileY, TILE_SIZE, wallColor, j, i, (i + j) % 8);
+                        break;
+                    case 5:
+                        DrawCaveFloor(res.hdcBuffer, tileX, tileY, TILE_SIZE, wallColor, j, i, (i + j) % 8);
+                        break;
+                    case 6:
+                        DrawCaveWall(res.hdcBuffer, tileX, tileY, TILE_SIZE, wallColor, j, i, (i + j) % 8);
+                        break;
+                    case 7:
+                        DrawMountain(res.hdcBuffer, tileX, tileY, TILE_SIZE, wallColor, j, i, (i + j) % 8);
+                        break;
+                    case 8:
+                        DrawDesertFloor(res.hdcBuffer, tileX, tileY, TILE_SIZE, wallColor, j, i, (i + j) % 8);
+                        break;
+                    case 9:
+                        DrawDesertWall(res.hdcBuffer, tileX, tileY, TILE_SIZE, wallColor, j, i, (i + j) % 8);
+                        break;
+                    default:
+                        DrawWall(res.hdcBuffer, tileX, tileY, TILE_SIZE, wallColor, j, i, (i * 7 + j * 13) % 8);
+                        break;
                 }
             }
         }
-        int playerTileX = centerX;
-        int playerTileY = centerY;
-        DrawPlayer(hdcBuffer, playerTileX, playerTileY, TILE_SIZE, playerColor);
 
+        // Рисуем игрока
+        DrawPlayer(res.hdcBuffer, centerX, centerY, TILE_SIZE, playerColor);
+
+        // Интерфейс
         std::string coordText = "X: " + std::to_string(playerX) + "  Y: " + std::to_string(playerY);
-        TextOutA(hdcBuffer, 10, 10, coordText.c_str(), coordText.length());
+        TextOutA(res.hdcBuffer, 10, 10, coordText.c_str(), coordText.length());
 
-        std::string controlsText = "WASD - �������� | ������ - �����";
-        TextOutA(hdcBuffer, 10, screenHeight - 30, controlsText.c_str(), controlsText.length());
+        std::string controlsText = "WASD - Movement | SPACE - Exit";
+        TextOutA(res.hdcBuffer, 10, screenHeight - 30, controlsText.c_str(), controlsText.length());
 
-        if (Labir[playerY][playerX] == 2)
-        {
-            std::string winText = "���� �������!";
-            TextOutA(hdcBuffer, screenWidth/2 - 150, screenHeight/2, winText.c_str(), winText.length());
+        if (Labir[playerY][playerX] == 3) {
+            std::string winText = "TEMPLE ESCAPED!";
+            TextOutA(res.hdcBuffer, screenWidth / 2 - 150, screenHeight / 2, winText.c_str(), winText.length());
         }
 
-        BitBlt(hdc, 0, 0, screenWidth, screenHeight, hdcBuffer, 0, 0, SRCCOPY);
+        // Вывод на экран
+        BitBlt(res.hdc, 0, 0, screenWidth, screenHeight, res.hdcBuffer, 0, 0, SRCCOPY);
+
+        // Обработка ввода
         if (_kbhit() || firstFrame) {
             firstFrame = false;
-
-            if (_kbhit()) {
-                c = _getwch();
-                if (c == ' ') break;
-                if(Labir[playerY][playerX] == 2)
-                    continue;
-                int newY = playerY, newX = playerX;
-                switch (c)
-                {
-                    case 'w': case 'W': case '�': case '�': newY--; break;
-                    case 's': case 'S': case '�': case '�': newY++; break;
-                    case 'a': case 'A': case '�': case '�': newX--; break;
-                    case 'd': case 'D': case '�': case '�': newX++; break;
-                }
-
-                if (inBounds(newY, newX, n, m) && Labir[newY][newX] != 1)
-                {
-                    playerY = newY;
-                    playerX = newX;
-                }
-            }
+            ProcessInput(c, playerX, playerY, n, m, Labir, exitRequested);
         }
 
         Sleep(16);
     }
 
-    DeleteObject(hFont);
-    DeleteObject(hBitmap);
-    DeleteDC(hdcBuffer);
-    DeleteObject(hBackgroundBrush);
-    ReleaseDC(HConsole, hdc);
+    // Очистка ресурсов
+    CleanupResources(res);
+    PostMessage(hConsoleWnd, WM_CLOSE, 0, 0);
 }
 
-unsigned int textureHash(int x, int y, int variant) {
-    unsigned int hash = (x * 73856093) ^ (y * 19349663) ^ (variant * 83492791);
-    hash = (hash >> 16) ^ (hash & 0xFFFF);
-    return hash;
-}
+// Оптимизированные функции рисования
 
-int textureRand(unsigned int &seed) {
-    seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF;
-    return seed;
-}
+void DrawWater(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant) {
+    COLORREF waterColor = RGB(30, 60, 150);
+    COLORREF darkWater = RGB(20, 40, 120);
+    COLORREF lightWater = RGB(50, 100, 200);
 
-void DrawWall(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant)
-{
-    HBRUSH backgroundBrush = CreateSolidBrush(color);
-    SelectObject(hdc, backgroundBrush);
-    SelectObject(hdc, GetStockObject(NULL_PEN));
+    HBRUSH waterBrush = CreateSolidBrush(waterColor);
+    HBRUSH oldBrush = static_cast<HBRUSH>(SelectObject(hdc, waterBrush));
+    HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, GetStockObject(NULL_PEN)));
+
     Rectangle(hdc, x, y, x + size, y + size);
+
     unsigned int seed = textureHash(blockX, blockY, variant);
 
-    int numPixels = 60 + textureRand(seed) % 80;
-    int numLines = 15 + textureRand(seed) % 20;
-    int numShapes = 3 + textureRand(seed) % 6;
-    int numCracks = 2 + textureRand(seed) % 5;
+    // Волны
+    HPEN wavePen = CreatePen(PS_SOLID, 2, lightWater);
+    SelectObject(hdc, wavePen);
 
-    COLORREF darkColor = RGB(
-        std::max(0, GetRValue(color) - 30),
-        std::max(0, GetGValue(color) - 25),
-        std::max(0, GetBValue(color) - 20)
-    );
+    int waveCount = 5 + textureRand(seed) % 8;
+    for (int i = 0; i < waveCount; i++) {
+        int waveY = y + 10 + textureRand(seed) % (size - 20);
+        int waveStart = x + textureRand(seed) % (size / 4);
+        int waveLength = size / 3 + textureRand(seed) % (size / 2);
 
-    COLORREF lightColor = RGB(
-        std::min(255, GetRValue(color) + 30),
-        std::min(255, GetGValue(color) + 25),
-        std::min(255, GetBValue(color) + 20)
-    );
-
-    HBRUSH darkBrush = CreateSolidBrush(darkColor);
-    HBRUSH lightBrush = CreateSolidBrush(lightColor);
-
-    if (variant % 3 == 0) {
-        int brickWidth = size / 4 + textureRand(seed) % (size / 8);
-        int brickHeight = size / 8 + textureRand(seed) % (size / 16);
-
-        HPEN mortarPen = CreatePen(PS_SOLID, 1, darkColor);
-        SelectObject(hdc, mortarPen);
-
-        for (int row = 0; row < size; row += brickHeight) {
-            for (int col = 0; col < size; col += brickWidth) {
-                int offset = (row / brickHeight) % 2 == 0 ? 0 : brickWidth / 2;
-
-                if (col + offset < size) {
-                    int drawX = x + col + offset;
-                    int drawY = y + row;
-
-                    if (drawX < x + size && drawY < y + size) {
-                        if (drawY < y + size) {
-                            MoveToEx(hdc, std::max(x, drawX), drawY, NULL);
-                            LineTo(hdc, std::min(x + size, drawX + brickWidth), drawY);
-                        }
-                        if (drawX < x + size && row < size) {
-                            MoveToEx(hdc, drawX, std::max(y, drawY), NULL);
-                            LineTo(hdc, drawX, std::min(y + size, drawY + brickHeight));
-                        }
-                    }
-                }
-            }
-        }
-        DeleteObject(mortarPen);
-    }
-    if (variant % 3 == 1) {
-        int stoneSize = size / 6 + textureRand(seed) % (size / 12);
-
-        for (int i = 0; i < 15; i++) {
-            int stoneX = x + 5 + textureRand(seed) % (size - 10);
-            int stoneY = y + 5 + textureRand(seed) % (size - 10);
-            stoneX = std::max(x + 2, std::min(x + size - stoneSize - 2, stoneX));
-            stoneY = std::max(y + 2, std::min(y + size - stoneSize - 2, stoneY));
-
-            POINT points[4] = {
-                { stoneX, stoneY },
-                { stoneX + stoneSize/2, stoneY - stoneSize/4 },
-                { stoneX + stoneSize, stoneY },
-                { stoneX + stoneSize/2, stoneY + stoneSize/2 }
-            };
-
-            Polygon(hdc, points, 4);
+        MoveToEx(hdc, waveStart, waveY, NULL);
+        for (int j = 0; j < waveLength; j += 5) {
+            int curve = textureRand(seed) % 5 - 2;
+            LineTo(hdc, waveStart + j, waveY + curve);
         }
     }
-    for (int i = 0; i < numCracks; i++) {
-        int startX = x + 2 + textureRand(seed) % (size - 4);
-        int startY = y + 2 + textureRand(seed) % (size - 4);
+    DeleteObject(wavePen);
+
+    // Блики на воде
+    HBRUSH highlightBrush = CreateSolidBrush(lightWater);
+    SelectObject(hdc, highlightBrush);
+
+    int highlightCount = 10 + textureRand(seed) % 15;
+    for (int i = 0; i < highlightCount; i++) {
+        int highlightX = x + 5 + textureRand(seed) % (size - 10);
+        int highlightY = y + 5 + textureRand(seed) % (size - 10);
+        int highlightSize = 3 + textureRand(seed) % 6;
+
+        Ellipse(hdc, highlightX, highlightY,
+                highlightX + highlightSize, highlightY + highlightSize);
+    }
+
+    // Восстановление исходных объектов
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
+    DeleteObject(waterBrush);
+    DeleteObject(highlightBrush);
+}
+
+void DrawCaveFloor(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant) {
+    COLORREF caveFloorColor = RGB(80, 60, 50);
+    HBRUSH floorBrush = CreateSolidBrush(caveFloorColor);
+    HBRUSH oldBrush = static_cast<HBRUSH>(SelectObject(hdc, floorBrush));
+    HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, GetStockObject(NULL_PEN)));
+
+    Rectangle(hdc, x, y, x + size, y + size);
+
+    unsigned int seed = textureHash(blockX, blockY, variant);
+
+    // Камни и неровности
+    int stoneCount = 15 + textureRand(seed) % 20;
+    for (int i = 0; i < stoneCount; i++) {
+        int stoneX = x + 2 + textureRand(seed) % (size - 4);
+        int stoneY = y + 2 + textureRand(seed) % (size - 4);
+        int stoneSize = 2 + textureRand(seed) % 5;
+
+        COLORREF stoneColor = RGB(
+            60 + textureRand(seed) % 40,
+            40 + textureRand(seed) % 30,
+            30 + textureRand(seed) % 25
+        );
+
+        HBRUSH stoneBrush = CreateSolidBrush(stoneColor);
+        SelectObject(hdc, stoneBrush);
+        Ellipse(hdc, stoneX, stoneY, stoneX + stoneSize, stoneY + stoneSize);
+        DeleteObject(stoneBrush);
+    }
+
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
+    DeleteObject(floorBrush);
+}
+
+void DrawCaveWall(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant) {
+    COLORREF caveWallColor = RGB(60, 45, 35);
+    HBRUSH wallBrush = CreateSolidBrush(caveWallColor);
+    HBRUSH oldBrush = static_cast<HBRUSH>(SelectObject(hdc, wallBrush));
+    HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, GetStockObject(NULL_PEN)));
+
+    Rectangle(hdc, x, y, x + size, y + size);
+
+    unsigned int seed = textureHash(blockX, blockY, variant);
+
+    // Сталактиты/сталагмиты
+    HPEN formationPen = CreatePen(PS_SOLID, 3, RGB(70, 55, 45));
+    SelectObject(hdc, formationPen);
+
+    int formationCount = 5 + textureRand(seed) % 8;
+    for (int i = 0; i < formationCount; i++) {
+        int startX = x + 5 + textureRand(seed) % (size - 10);
         int length = 5 + textureRand(seed) % 15;
 
-        HPEN crackPen = CreatePen(PS_SOLID, 1, darkColor);
-        SelectObject(hdc, crackPen);
+        if (textureRand(seed) % 2 == 0) {
+            // Сталактит (сверху)
+            MoveToEx(hdc, startX, y + 2, NULL);
+            LineTo(hdc, startX, y + 2 + length);
+        } else {
+            // Сталагмит (снизу)
+            MoveToEx(hdc, startX, y + size - 2, NULL);
+            LineTo(hdc, startX, y + size - 2 - length);
+        }
+    }
+
+    DeleteObject(formationPen);
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
+    DeleteObject(wallBrush);
+}
+
+void DrawMountain(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant) {
+    COLORREF mountainColor = RGB(120, 100, 90);
+    COLORREF snowColor = RGB(220, 220, 230);
+
+    HBRUSH mountainBrush = CreateSolidBrush(mountainColor);
+    HBRUSH oldBrush = static_cast<HBRUSH>(SelectObject(hdc, mountainBrush));
+    HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, GetStockObject(NULL_PEN)));
+
+    Rectangle(hdc, x, y, x + size, y + size);
+
+    unsigned int seed = textureHash(blockX, blockY, variant);
+
+    // Скалистая текстура
+    HPEN rockPen = CreatePen(PS_SOLID, 2, RGB(100, 80, 70));
+    SelectObject(hdc, rockPen);
+
+    int rockCount = 20 + textureRand(seed) % 30;
+    for (int i = 0; i < rockCount; i++) {
+        int startX = x + 3 + textureRand(seed) % (size - 6);
+        int startY = y + 3 + textureRand(seed) % (size - 6);
+        int length = 4 + textureRand(seed) % 12;
 
         MoveToEx(hdc, startX, startY, NULL);
         for (int j = 0; j < length; j++) {
             int dirX = textureRand(seed) % 3 - 1;
             int dirY = textureRand(seed) % 3 - 1;
-
-            startX += dirX;
-            startY += dirY;
-            startX = std::max(x + 1, std::min(x + size - 2, startX));
-            startY = std::max(y + 1, std::min(y + size - 2, startY));
-
-            LineTo(hdc, startX, startY);
+            LineTo(hdc, startX + dirX, startY + dirY);
         }
+    }
+    DeleteObject(rockPen);
 
-        DeleteObject(crackPen);
+    // Снежные вершины
+    HBRUSH snowBrush = CreateSolidBrush(snowColor);
+    SelectObject(hdc, snowBrush);
+
+    int snowCount = 3 + textureRand(seed) % 5;
+    for (int i = 0; i < snowCount; i++) {
+        int snowX = x + textureRand(seed) % (size / 2);
+        int snowY = y + textureRand(seed) % (size / 3);
+        int snowSize = 4 + textureRand(seed) % 8;
+
+        Ellipse(hdc, snowX, snowY, snowX + snowSize, snowY + snowSize);
     }
 
-    for (int i = 0; i < 8 + textureRand(seed) % 12; i++) {
-        int spotX = x + 3 + textureRand(seed) % (size - 6);
-        int spotY = y + 3 + textureRand(seed) % (size - 6);
-        int spotSize = 2 + textureRand(seed) % 4;
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
+    DeleteObject(mountainBrush);
+    DeleteObject(snowBrush);
+}
 
-        COLORREF spotColor = textureRand(seed) % 100 < 70 ? darkColor : lightColor;
+void DrawDesertFloor(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant) {
+    COLORREF desertColor = RGB(210, 180, 140);
+    HBRUSH desertBrush = CreateSolidBrush(desertColor);
+    HBRUSH oldBrush = static_cast<HBRUSH>(SelectObject(hdc, desertBrush));
+    HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, GetStockObject(NULL_PEN)));
 
-        for (int dx = -spotSize; dx <= spotSize; dx++) {
-            for (int dy = -spotSize; dy <= spotSize; dy++) {
-                if (dx*dx + dy*dy <= spotSize*spotSize) {
-                    int px = spotX + dx;
-                    int py = spotY + dy;
-                    if (px >= x && px < x + size && py >= y && py < y + size) {
-                        SetPixel(hdc, px, py, spotColor);
-                    }
-                }
+    Rectangle(hdc, x, y, x + size, y + size);
+
+    unsigned int seed = textureHash(blockX, blockY, variant);
+
+    // Песчаные волны
+    HPEN sandPen = CreatePen(PS_SOLID, 2, RGB(190, 160, 120));
+    SelectObject(hdc, sandPen);
+
+    int waveCount = 8 + textureRand(seed) % 12;
+    for (int i = 0; i < waveCount; i++) {
+        int waveY = y + 10 + textureRand(seed) % (size - 20);
+        int waveStart = x + textureRand(seed) % (size / 4);
+        int waveLength = size / 2 + textureRand(seed) % (size / 2);
+
+        MoveToEx(hdc, waveStart, waveY, NULL);
+        for (int j = 0; j < waveLength; j += 4) {
+            int curve = textureRand(seed) % 3 - 1;
+            LineTo(hdc, waveStart + j, waveY + curve);
+        }
+    }
+    DeleteObject(sandPen);
+
+    // Песчинки
+    int grainCount = 50 + textureRand(seed) % 100;
+    for (int i = 0; i < grainCount; i++) {
+        int grainX = x + textureRand(seed) % size;
+        int grainY = y + textureRand(seed) % size;
+        COLORREF grainColor = RGB(
+            180 + textureRand(seed) % 40,
+            150 + textureRand(seed) % 40,
+            110 + textureRand(seed) % 40
+        );
+        SetPixel(hdc, grainX, grainY, grainColor);
+    }
+
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
+    DeleteObject(desertBrush);
+}
+
+void DrawDesertWall(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant) {
+    COLORREF desertWallColor = RGB(180, 150, 110);
+    HBRUSH wallBrush = CreateSolidBrush(desertWallColor);
+    HBRUSH oldBrush = static_cast<HBRUSH>(SelectObject(hdc, wallBrush));
+    HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, GetStockObject(NULL_PEN)));
+
+    Rectangle(hdc, x, y, x + size, y + size);
+
+    unsigned int seed = textureHash(blockX, blockY, variant);
+
+    // Трещины в скалах
+    HPEN crackPen = CreatePen(PS_SOLID, 2, RGB(150, 120, 90));
+    SelectObject(hdc, crackPen);
+
+    int crackCount = 5 + textureRand(seed) % 10;
+    for (int i = 0; i < crackCount; i++) {
+        int startX = x + 5 + textureRand(seed) % (size - 10);
+        int startY = y + 5 + textureRand(seed) % (size - 10);
+        int length = 8 + textureRand(seed) % 20;
+
+        MoveToEx(hdc, startX, startY, NULL);
+        for (int j = 0; j < length; j++) {
+            int dirX = textureRand(seed) % 3 - 1;
+            int dirY = textureRand(seed) % 3 - 1;
+            LineTo(hdc, startX + dirX, startY + dirY);
+        }
+    }
+    DeleteObject(crackPen);
+
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
+    DeleteObject(wallBrush);
+}
+
+void DrawExitPoint(HDC hdc, int x, int y, int size, COLORREF color) {
+    int centerX = x + size / 2;
+    int centerY = y + size / 2;
+    int radius = size * 0.3;
+
+    // Внешний круг
+    HBRUSH outerBrush = CreateSolidBrush(RGB(100, 200, 100));
+    HPEN outerPen = CreatePen(PS_SOLID, 3, RGB(80, 180, 80));
+    HBRUSH oldBrush = static_cast<HBRUSH>(SelectObject(hdc, outerBrush));
+    HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, outerPen));
+
+    Ellipse(hdc, centerX - radius, centerY - radius,
+            centerX + radius, centerY + radius);
+
+    // Внутренний круг
+    HBRUSH innerBrush = CreateSolidBrush(RGB(150, 250, 150));
+    SelectObject(hdc, innerBrush);
+    Ellipse(hdc, centerX - radius/1.8, centerY - radius/1.8,
+            centerX + radius/1.8, centerY + radius/1.8);
+
+    // Центральная точка
+    HBRUSH centerBrush = CreateSolidBrush(RGB(200, 255, 200));
+    SelectObject(hdc, centerBrush);
+    Ellipse(hdc, centerX - radius/3, centerY - radius/3,
+            centerX + radius/3, centerY + radius/3);
+
+    // Свечение
+    for (int i = 0; i < 25; i++) {
+        int px = centerX - radius + rand() % (radius * 2);
+        int py = centerY - radius + rand() % (radius * 2);
+
+        if ((px - centerX) * (px - centerX) + (py - centerY) * (py - centerY) <= radius * radius) {
+            SetPixel(hdc, px, py, RGB(180, 255, 180));
+        }
+    }
+
+    // Восстановление исходных объектов
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
+    DeleteObject(outerBrush);
+    DeleteObject(outerPen);
+    DeleteObject(innerBrush);
+    DeleteObject(centerBrush);
+}
+
+void DrawWall(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant) {
+    // Базовый цвет стены
+    COLORREF wallBase = RGB(100, 80, 60);
+    COLORREF wallDark = RGB(80, 60, 40);
+    COLORREF wallLight = RGB(120, 100, 80);
+
+    HBRUSH wallBrush = CreateSolidBrush(wallBase);
+    HBRUSH oldBrush = static_cast<HBRUSH>(SelectObject(hdc, wallBrush));
+    HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, GetStockObject(NULL_PEN)));
+
+    Rectangle(hdc, x, y, x + size, y + size);
+
+    unsigned int seed = textureHash(blockX, blockY, variant);
+
+    // Кирпичная кладка - более четкая и структурированная
+    if (variant % 2 == 0) {
+        int brickWidth = size / 4;
+        int brickHeight = size / 8;
+        int mortarSize = 2;
+
+        HPEN mortarPen = CreatePen(PS_SOLID, mortarSize, wallDark);
+        SelectObject(hdc, mortarPen);
+
+        // Горизонтальные линии
+        for (int row = y + brickHeight; row < y + size; row += brickHeight) {
+            MoveToEx(hdc, x, row, NULL);
+            LineTo(hdc, x + size, row);
+        }
+
+        // Вертикальные линии со смещением
+        for (int row = y; row < y + size; row += brickHeight) {
+            int offset = (row / brickHeight) % 2 == 0 ? 0 : brickWidth / 2;
+            for (int col = x + offset; col < x + size; col += brickWidth) {
+                MoveToEx(hdc, col, std::max(y, row), NULL);
+                LineTo(hdc, col, std::min(y + size, row + brickHeight));
             }
         }
+
+        DeleteObject(mortarPen);
     }
 
-    for (int i = 0; i < numPixels; i++) {
+    // Каменная текстура - более натуральная
+    else {
+        HBRUSH stoneBrush = CreateSolidBrush(wallLight);
+        SelectObject(hdc, stoneBrush);
+
+        // Крупные камни
+        int stoneCount = 8 + textureRand(seed) % 6;
+        for (int i = 0; i < stoneCount; i++) {
+            int stoneX = x + 5 + textureRand(seed) % (size - 10);
+            int stoneY = y + 5 + textureRand(seed) % (size - 10);
+            int stoneW = 8 + textureRand(seed) % 12;
+            int stoneH = 6 + textureRand(seed) % 10;
+
+            // Немного неправильная форма для натуральности
+            POINT stone[6] = {
+                {stoneX, stoneY},
+                {stoneX + stoneW, stoneY},
+                {stoneX + stoneW + 2, stoneY + stoneH/2},
+                {stoneX + stoneW, stoneY + stoneH},
+                {stoneX, stoneY + stoneH},
+                {stoneX - 2, stoneY + stoneH/2}
+            };
+
+            Polygon(hdc, stone, 6);
+        }
+        DeleteObject(stoneBrush);
+    }
+
+    // Тени и блики для объема
+    HPEN shadowPen = CreatePen(PS_SOLID, 1, wallDark);
+    HPEN highlightPen = CreatePen(PS_SOLID, 1, wallLight);
+
+    // Тени снизу и справа
+    SelectObject(hdc, shadowPen);
+    for (int i = 0; i < 15; i++) {
+        int lineX = x + textureRand(seed) % size;
+        int lineY = y + textureRand(seed) % size;
+        MoveToEx(hdc, lineX, lineY, NULL);
+        LineTo(hdc, lineX + 3, lineY + 3);
+    }
+
+    // Блики сверху и слева
+    SelectObject(hdc, highlightPen);
+    for (int i = 0; i < 12; i++) {
+        int lineX = x + textureRand(seed) % size;
+        int lineY = y + textureRand(seed) % size;
+        MoveToEx(hdc, lineX, lineY, NULL);
+        LineTo(hdc, lineX - 2, lineY - 2);
+    }
+
+    // Шероховатости
+    int roughnessCount = 30 + textureRand(seed) % 40;
+    for (int i = 0; i < roughnessCount; i++) {
         int px = x + 2 + textureRand(seed) % (size - 4);
         int py = y + 2 + textureRand(seed) % (size - 4);
 
-        if (px >= x && px < x + size && py >= y && py < y + size) {
-            if (textureRand(seed) % 100 < 60) {
-                SetPixel(hdc, px, py, RGB(
-                    std::max(0, GetRValue(color) - 20 - textureRand(seed) % 35),
-                    std::max(0, GetGValue(color) - 15 - textureRand(seed) % 30),
-                    std::max(0, GetBValue(color) - 10 - textureRand(seed) % 25)
-                ));
-            }
-            else if (textureRand(seed) % 100 < 80) {
-                SetPixel(hdc, px, py, RGB(
-                    std::min(255, GetRValue(color) + 15 + textureRand(seed) % 30),
-                    std::min(255, GetGValue(color) + 10 + textureRand(seed) % 25),
-                    std::min(255, GetBValue(color) + 5 + textureRand(seed) % 20)
-                ));
-            }
-        }
+        COLORREF pixelColor = textureRand(seed) % 100 < 70 ? wallDark : wallLight;
+        SetPixel(hdc, px, py, pixelColor);
     }
 
-    for (int i = 0; i < numLines; i++) {
-        int startX = x + 2 + textureRand(seed) % (size - 4);
-        int startY = y + 2 + textureRand(seed) % (size - 4);
-        int length = 3 + textureRand(seed) % 15;
-        int thickness = 1 + textureRand(seed) % 2;
-        COLORREF lineColor = textureRand(seed) % 100 < 70 ? darkColor : lightColor;
-        HPEN linePen = CreatePen(PS_SOLID, thickness, lineColor);
-        SelectObject(hdc, linePen);
-
-        int endX = startX;
-        int endY = startY;
-
-        MoveToEx(hdc, startX, startY, NULL);
-        for (int j = 0; j < length; j++) {
-            int dirX = textureRand(seed) % 3 - 1;
-            int dirY = textureRand(seed) % 3 - 1;
-
-            endX += dirX;
-            endY += dirY;
-
-            endX = std::max(x + 1, std::min(x + size - 2, endX));
-            endY = std::max(y + 1, std::min(y + size - 2, endY));
-
-            LineTo(hdc, endX, endY);
-        }
-
-        DeleteObject(linePen);
-    }
-
-    for (int i = 0; i < numShapes; i++) {
-        int shapeX = x + 3 + textureRand(seed) % (size - 6);
-        int shapeY = y + 3 + textureRand(seed) % (size - 6);
-        int shapeSize = 2 + textureRand(seed) % 5;
-
-        shapeX = std::max(x + 2, std::min(x + size - shapeSize - 2, shapeX));
-        shapeY = std::max(y + 2, std::min(y + size - shapeSize - 2, shapeY));
-
-        if (textureRand(seed) % 100 < 50) {
-            Rectangle(hdc, shapeX, shapeY, shapeX + shapeSize, shapeY + shapeSize);
-        } else {
-            Ellipse(hdc, shapeX, shapeY, shapeX + shapeSize, shapeY + shapeSize);
-        }
-    }
-
-    DeleteObject(darkBrush);
-    DeleteObject(lightBrush);
-    DeleteObject(backgroundBrush);
+    DeleteObject(shadowPen);
+    DeleteObject(highlightPen);
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
+    DeleteObject(wallBrush);
 }
 
-void DrawFloor(HDC hdc, int x, int y, int size, COLORREF baseColor)
-{
-    HBRUSH floorBrush = CreateSolidBrush(baseColor);
-    SelectObject(hdc, floorBrush);
-    SelectObject(hdc, GetStockObject(NULL_PEN));
+void DrawFloor(HDC hdc, int x, int y, int size, COLORREF color, int blockX, int blockY, int variant) {
+    HBRUSH wallBrush = CreateSolidBrush(color);
+    HBRUSH oldBrush = static_cast<HBRUSH>(SelectObject(hdc, wallBrush));
+    HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, GetStockObject(NULL_PEN)));
+
     Rectangle(hdc, x, y, x + size, y + size);
 
     int step = 4;
-    int index = 0;
+    for (int py = y; py < y + size; py += step) {
+        for (int px = x; px < x + size; px += step) {
+            unsigned int seed = textureHash(blockX, blockY,
+                                          (px - x) + (py - y) * size + variant * 1000);
 
-    for (int py = y; py < y + size; py += step)
-    {
-        for (int px = x; px < x + size; px += step)
-        {
-            unsigned int seed = textureHash(px, py, index++);
-
-            if (textureRand(seed) % 100 < 70)
-            {
-                int grainSize = 1 + textureRand(seed) % 2;
+            if (textureRand(seed) % 100 < 70) {
+                int grainSize = 1 + textureRand(seed) % 3;
                 int offsetX = textureRand(seed) % step;
                 int offsetY = textureRand(seed) % step;
 
-                int variation = 25 - textureRand(seed) % 50;
+                int variation = 30 - textureRand(seed) % 60;
                 COLORREF grainColor = RGB(
-                    std::min(255, std::max(0, GetRValue(baseColor) + variation)),
-                    std::min(255, std::max(0, GetGValue(baseColor) + variation)),
-                    std::min(255, std::max(0, GetBValue(baseColor) + variation))
+                    std::min(255, std::max(0, GetRValue(color) + variation)),
+                    std::min(255, std::max(0, GetGValue(color) + variation)),
+                    std::min(255, std::max(0, GetBValue(color) + variation))
                 );
 
                 HBRUSH grainBrush = CreateSolidBrush(grainColor);
                 SelectObject(hdc, grainBrush);
-                Ellipse(hdc, px + offsetX, py + offsetY,
-                        px + offsetX + grainSize, py + offsetY + grainSize);
+                Rectangle(hdc, px + offsetX, py + offsetY,
+                         px + offsetX + grainSize, py + offsetY + grainSize);
                 DeleteObject(grainBrush);
             }
         }
     }
 
-    DeleteObject(floorBrush);
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
+    DeleteObject(wallBrush);
 }
 
-void DrawPlayer(HDC hdc, int x, int y, int size, COLORREF color)
-{
+void DrawPlayer(HDC hdc, int x, int y, int size, COLORREF color) {
     int radius = size * 0.3;
     int centerX = x + size / 2;
     int centerY = y + size / 2;
 
     HBRUSH playerBrush = CreateSolidBrush(color);
     HPEN playerPen = CreatePen(PS_SOLID, 2, RGB(180, 140, 80));
-
-    SelectObject(hdc, playerBrush);
-    SelectObject(hdc, playerPen);
+    HBRUSH oldBrush = static_cast<HBRUSH>(SelectObject(hdc, playerBrush));
+    HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, playerPen));
 
     Ellipse(hdc, centerX - radius, centerY - radius,
             centerX + radius, centerY + radius);
@@ -413,22 +716,23 @@ void DrawPlayer(HDC hdc, int x, int y, int size, COLORREF color)
     Ellipse(hdc, centerX - radius/3, centerY - radius/3,
             centerX - radius/6, centerY - radius/6);
 
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
     DeleteObject(playerBrush);
     DeleteObject(playerPen);
     DeleteObject(highlightBrush);
 }
 
-void DrawExit(HDC hdc, int x, int y, int size, COLORREF color)
-{
+void DrawExit(HDC hdc, int x, int y, int size, COLORREF color) {
     int centerX = x + size / 2;
     int centerY = y + size / 2;
     int radius = size * 0.35;
 
     HBRUSH outerBrush = CreateSolidBrush(RGB(180, 70, 70));
     HPEN outerPen = CreatePen(PS_SOLID, 3, RGB(150, 50, 50));
+    HBRUSH oldBrush = static_cast<HBRUSH>(SelectObject(hdc, outerBrush));
+    HPEN oldPen = static_cast<HPEN>(SelectObject(hdc, outerPen));
 
-    SelectObject(hdc, outerBrush);
-    SelectObject(hdc, outerPen);
     Ellipse(hdc, centerX - radius, centerY - radius,
             centerX + radius, centerY + radius);
 
@@ -451,6 +755,8 @@ void DrawExit(HDC hdc, int x, int y, int size, COLORREF color)
         }
     }
 
+    SelectObject(hdc, oldBrush);
+    SelectObject(hdc, oldPen);
     DeleteObject(outerBrush);
     DeleteObject(outerPen);
     DeleteObject(innerBrush);
