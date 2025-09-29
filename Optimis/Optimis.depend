@@ -11,7 +11,7 @@
 	<windows.h>
 	<conio.h>
 
-1758499029 source:c:\users\max\desktop\cpp\labirint\optimis\main.cpp
+1759160264 source:c:\users\max\desktop\cpp\labirint\optimis\main.cpp
 	<iostream>
 	<cstdlib>
 	<conio.h>
@@ -21,7 +21,9 @@
 	<cmath>
 	<functional>
 	<string>
-	"gEneraTor.h"
+	<sstream>
+	<chrono>
+	"generator.h"
 	"VisualMaping.h"
 
 1757948466 source:c:\users\max\desktop\cpp\labirint\optimis\genereted.c
@@ -33,11 +35,20 @@
 1757949429 c:\users\max\desktop\cpp\labirint\optimis\generator.cpp
 	<iostream>
 
-1758498028 c:\users\max\desktop\cpp\labirint\optimis\generator.h
+1759146058 c:\users\max\desktop\cpp\labirint\optimis\generator.h
+	<vector>
+	<cstdlib>
+	<cmath>
+	<algorithm>
+	<functional>
+	<queue>
 
-1758498596 c:\users\max\desktop\cpp\labirint\optimis\visualmaping.h
+1759147182 c:\users\max\desktop\cpp\labirint\optimis\visualmaping.h
 	<cmath>
 	<string>
 	<algorithm>
 	<windows.h>
+	<conio.h>
+
+1759159755 c:\users\max\desktop\cpp\labirint\optimis\visualmenu.h
 

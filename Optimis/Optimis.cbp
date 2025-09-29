@@ -35,7 +35,9 @@
 			<Add option="-Wall" />
 			<Add option="-fexceptions" />
 		</Compiler>
+		<Unit filename="Menu.h" />
 		<Unit filename="VisualMaping.h" />
+		<Unit filename="VisualMenu.h" />
 		<Unit filename="gEneraTor.h" />
 		<Unit filename="main.cpp" />
 		<Extensions>

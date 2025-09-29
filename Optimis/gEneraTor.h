@@ -1,5 +1,12 @@
 #ifndef GENERATOR_H_INCLUDED
 #define GENERATOR_H_INCLUDED
+
+#include <vector>
+#include <cstdlib>
+#include <cmath>
+#include <algorithm>
+#include <functional>
+#include <queue>
 using namespace std;
 
 inline bool inBounds(int i, int j, int n, int m) {
@@ -8,331 +15,337 @@ inline bool inBounds(int i, int j, int n, int m) {
 
 enum Biome {
     FOREST,
-    CAVE,
+    PINE_FOREST,
+    BIRCH_FOREST,
     PLAINS,
     MOUNTAIN,
-    WATER,
-    DESERT
+    RIVER,
+    LAKE,
+    DESERT,
+    SNOW,
+    JUNGLE,
+    SWAMP,
+    BEACH,
+    OCEAN,
+    CAVE,
+    VOLCANO,
+    FLOWER_FIELDS,
+    MUSHROOM_FOREST
 };
 
 struct Cell {
     int value;
     Biome biome;
+    int elevation;
+    float moisture;
+    float temperature;
+    bool hasTree;
+    bool hasRock;
+    bool hasFlowers;
+    int resourceType;
 };
 
-void floodFill(vector<vector<Cell>>& grid, int x, int y, Biome biome, int n, int m) {
-    if (!inBounds(x, y, n, m) || grid[x][y].biome != FOREST) return;
+// Быстрая хэш-функция с защитой от переполнения
+inline int fastHash(int x, int y, int seed) {
+    // Используем меньшие простые числа для избежания переполнения
+    return (x * 374761393 + y * 668265263 + seed * 2246822519) & 0x7FFFFFFF;
+}
 
-    queue<pair<int, int>> q;
-    q.push(make_pair(x, y));
-    grid[x][y].biome = biome;
+// Функция интерполяции для плавности
+inline float interpolate(float a, float b, float t) {
+    return a + (b - a) * (t * t * (3 - 2 * t));
+}
 
-    int dx[] = {-1, 1, 0, 0};
-    int dy[] = {0, 0, -1, 1};
+// Оптимизированный плавный шум с кэшированием
+inline float smoothNoise(float x, float y, int seed) {
+    // Для больших координат используем модульную арифметику чтобы избежать больших чисел
+    int ix = (int)floor(x);
+    int iy = (int)floor(y);
+    float fx = x - ix;
+    float fy = y - iy;
 
-    while (!q.empty()) {
-        auto current = q.front();
-        q.pop();
-        int cx = current.first;
-        int cy = current.second;
+    // Ограничиваем координаты разумными пределами
+    ix = ix % 1000000;
+    iy = iy % 1000000;
 
-        for (int i = 0; i < 4; i++) {
-            int nx = cx + dx[i];
-            int ny = cy + dy[i];
+    float n0 = (fastHash(ix, iy, seed) % 10000) / 10000.0f;
+    float n1 = (fastHash(ix + 1, iy, seed) % 10000) / 10000.0f;
+    float n2 = (fastHash(ix, iy + 1, seed) % 10000) / 10000.0f;
+    float n3 = (fastHash(ix + 1, iy + 1, seed) % 10000) / 10000.0f;
 
-            if (inBounds(nx, ny, n, m) && grid[nx][ny].biome == FOREST) {
-                if (rand() % 100 < 65) {
-                    grid[nx][ny].biome = biome;
-                    q.push(make_pair(nx, ny));
-                }
-            }
+    float i0 = interpolate(n0, n1, fx);
+    float i1 = interpolate(n2, n3, fx);
+    return interpolate(i0, i1, fy);
+}
+
+// Оптимизированная генерация высоты для больших карт
+inline float generateElevation(int i, int j, int n, int m, int seed) {
+    // Для очень больших карт используем более агрессивное масштабирование
+    float scale_factor = min(1000.0f, max(n, m) / 100.0f);
+
+    float continentScale = 0.01f / scale_factor;
+    float continent = smoothNoise(i * continentScale, j * continentScale, seed + 100);
+    continent = pow(continent, 1.5f);
+
+    // Для больших карт уменьшаем детализацию гор
+    float mountainScale = 0.02f / scale_factor;
+    float mountains = smoothNoise(i * mountainScale, j * mountainScale, seed + 200);
+    mountains = max(0.0f, mountains - 0.4f) * 2.0f;
+
+    // Упрощаем холмы для больших карт
+    float hillScale = 0.05f / scale_factor; // Увеличиваем масштаб холмов
+    float hills = smoothNoise(i * hillScale, j * hillScale, seed + 300) * 0.2f;
+
+    float height = continent * 0.7f + mountains * 0.2f + hills * 0.1f;
+
+    return height;
+}
+
+// Оптимизированная генерация влажности
+inline float generateMoisture(int i, int j, int n, int m, int seed) {
+    float scale_factor = min(1000.0f, max(n, m) / 100.0f);
+    float largeScaleX = 10.0f / scale_factor;
+    float largeScaleY = 10.0f / scale_factor;
+
+    float largeScale = smoothNoise(i * largeScaleX, j * largeScaleY, seed + 100);
+    float smallScale = smoothNoise(i * 0.1f, j * 0.1f, seed + 200) * 0.3f;
+
+    // Упрощаем эффект океана для больших карт
+    float centerX = n / 2.0f;
+    float centerY = m / 2.0f;
+    float dist = sqrt(pow(i - centerX, 2) + pow(j - centerY, 2));
+    float maxDist = sqrt(centerX * centerX + centerY * centerY);
+    float oceanEffect = maxDist > 0 ? 1.0f - (dist / maxDist) * 0.3f : 1.0f;
+
+    return (largeScale * 0.7f + smallScale * 0.3f) * oceanEffect;
+}
+
+// Оптимизированная генерация температуры
+inline float generateTemperature(int i, int j, int n, int m, int seed) {
+    if (n <= 0) return 0.5f;
+
+    float baseTemp = 1.0f - abs((float)i / n - 0.5f) * 2.0f;
+
+    float scale_factor = min(1000.0f, max(n, m) / 100.0f);
+    float noiseScale = 0.05f / scale_factor;
+
+    float noise = smoothNoise(i * noiseScale, j * noiseScale, seed + 500) * 0.2f;
+    float seasonal = sin(i * 0.02f) * 0.1f; // Уменьшаем амплитуду для больших карт
+
+    return baseTemp + noise + seasonal;
+}
+
+// Динамическое определение биома
+inline Biome determineBiome(float elevation, float moisture, float temperature, int i, int j, int seed) {
+    if (elevation < 0.2f) {
+        if (temperature < 0.3f) return SNOW;
+        if (moisture > 0.7f) return SWAMP;
+        if (moisture > 0.4f) return BEACH;
+        return OCEAN;
+    }
+    else if (elevation < 0.4f) {
+        if (temperature < 0.2f) return SNOW;
+        if (temperature > 0.8f) {
+            if (moisture < 0.2f) return DESERT;
+            return JUNGLE;
         }
+        if (moisture > 0.7f) return SWAMP;
+        if (moisture > 0.5f) return FOREST;
+        if (moisture > 0.3f) return PLAINS;
+        return DESERT;
+    }
+    else if (elevation < 0.7f) {
+        if (temperature < 0.3f) {
+            return PINE_FOREST;
+        }
+        if (moisture > 0.6f) {
+            return FOREST;
+        }
+        if (moisture > 0.3f) return PLAINS;
+        return MOUNTAIN;
+    }
+    else {
+        if (temperature < 0.4f) return SNOW;
+        return MOUNTAIN;
     }
 }
 
-void generateStructures(vector<vector<Cell>>& grid, int n, int m) {
-    // Generate rivers
-    for (int i = 0; i < 2; i++) {
-        int startX = 5 + rand() % (n - 10);
-        int currentX = startX;
-        int currentY = 0;
+// Упрощенная генерация растительности для больших карт
+inline void generateVegetation(vector<vector<int>>& Labir, Biome biome, int i, int j, int seed) {
+    // Используем более быстрый шум для больших карт
+    float noise = (fastHash(i, j, seed + 1300) % 10000) / 10000.0f;
 
-        while (currentY < m) {
-            if (inBounds(currentX, currentY, n, m)) {
-                grid[currentX][currentY].value = 0;
-                grid[currentX][currentY].biome = WATER;
-
-                // Make river wider
-                if (inBounds(currentX-1, currentY, n, m)) {
-                    grid[currentX-1][currentY].value = 0;
-                    grid[currentX-1][currentY].biome = WATER;
-                }
-                if (inBounds(currentX+1, currentY, n, m)) {
-                    grid[currentX+1][currentY].value = 0;
-                    grid[currentX+1][currentY].biome = WATER;
-                }
-            }
-
-            int moveX = (rand() % 3) - 1;
-            currentX = max(2, min(n-3, currentX + moveX));
-            currentY++;
-        }
-    }
-
-    // Generate mountains
-    for (int i = 0; i < 4; i++) {
-        int centerX = 5 + rand() % (n - 10);
-        int centerY = 5 + rand() % (m - 10);
-        int radius = 3 + rand() % 4;
-
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dy = -radius; dy <= radius; dy++) {
-                if (dx*dx + dy*dy <= radius*radius) {
-                    int x = centerX + dx;
-                    int y = centerY + dy;
-                    if (inBounds(x, y, n, m)) {
-                        if (rand() % 100 < 70) {
-                            grid[x][y].value = 1;
-                            grid[x][y].biome = MOUNTAIN;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Generate caves
-    for (int i = 0; i < 3; i++) {
-        int caveX = 5 + rand() % (n - 10);
-        int caveY = 5 + rand() % (m - 10);
-        int caveSize = 3 + rand() % 4;
-
-        for (int dx = -caveSize; dx <= caveSize; dx++) {
-            for (int dy = -caveSize; dy <= caveSize; dy++) {
-                if (abs(dx) + abs(dy) <= caveSize) {
-                    int x = caveX + dx;
-                    int y = caveY + dy;
-                    if (inBounds(x, y, n, m)) {
-                        grid[x][y].value = 0;
-                        grid[x][y].biome = CAVE;
-                    }
-                }
-            }
-        }
+    switch (biome) {
+        case FOREST:
+            if (noise < 0.3f) Labir[i][j] = 6;
+            break;
+        case PINE_FOREST:
+            if (noise < 0.25f) Labir[i][j] = 17;
+            break;
+        case BIRCH_FOREST:
+            if (noise < 0.2f) Labir[i][j] = 18;
+            break;
+        case PLAINS:
+            if (noise < 0.1f) Labir[i][j] = 16;
+            break;
+        case JUNGLE:
+            if (noise < 0.4f) Labir[i][j] = 20;
+            break;
+        case DESERT:
+            if (noise < 0.05f) Labir[i][j] = 8;
+            break;
+        default:
+            break;
     }
 }
 
-bool isValidSpawnLocation(vector<vector<int>>& Labir, int x, int y, int n, int m) {
-    if (!inBounds(x, y, n, m)) return false;
-
-    // Проверяем, что сам тайл проходимый
-    int tile = Labir[x][y];
-    if (tile != 0 && tile != 5 && tile != 8) return false;
-
-    // Проверяем область 3x3 вокруг
-    for (int dx = -1; dx <= 1; dx++) {
-        for (int dy = -1; dy <= 1; dy++) {
-            if (inBounds(x+dx, y+dy, n, m)) {
-                int adjacentTile = Labir[x+dx][y+dy];
-                // Если рядом есть непроходимый тайл - не подходит
-                if (adjacentTile == 1 || adjacentTile == 4 ||
-                    adjacentTile == 6 || adjacentTile == 7 || adjacentTile == 9) {
-                    return false;
-                }
-            }
-        }
-    }
-
-    return true;
-}
-
+// Оптимизированная основная функция генерации
 void GeneratorMap(vector<vector<int>>& Labir, int n, int m, int& spawnX, int& spawnY) {
-    // Создаем временную сетку с расширенной информацией
-    vector<vector<Cell>> grid(n, vector<Cell>(m));
+    int seed = rand();
 
-    // Инициализация шумом
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < m; j++) {
-            grid[i][j].value = (rand() % 100 < 40) ? 1 : 0;
-            grid[i][j].biome = FOREST;
-        }
-    }
-
-    // Клеточный автомат для сглаживания
-    for (int iter = 0; iter < 4; iter++) {
-        vector<vector<Cell>> temp = grid;
+    // Предварительная проверка на слишком большие размеры
+    if (n > 1000 || m > 1000) {
+        // Для очень больших карт используем упрощенную генерацию
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < m; j++) {
-                int wallCount = 0;
-                int neighborCount = 0;
+                float elevation = generateElevation(i, j, n, m, seed);
 
-                for (int dx = -1; dx <= 1; dx++) {
-                    for (int dy = -1; dy <= 1; dy++) {
-                        if (dx == 0 && dy == 0) continue;
-                        if (inBounds(i+dx, j+dy, n, m)) {
-                            wallCount += temp[i+dx][j+dy].value;
-                            neighborCount++;
-                        }
-                    }
-                }
-
-                if (neighborCount > 0) {
-                    if (wallCount > neighborCount * 0.6) {
-                        grid[i][j].value = 1;
-                    } else if (wallCount < neighborCount * 0.4) {
-                        grid[i][j].value = 0;
-                    }
-                }
-            }
-        }
-    }
-
-    // Генерация биомов
-    vector<Biome> biomes = {PLAINS, CAVE, MOUNTAIN, DESERT};
-    for (const auto& biome : biomes) {
-        int startX = 8 + rand() % (n - 16);
-        int startY = 8 + rand() % (m - 16);
-        floodFill(grid, startX, startY, biome, n, m);
-    }
-
-    // Добавление структур
-    generateStructures(grid, n, m);
-
-    // Конвертация обратно в int
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < m; j++) {
-            // Присваиваем значения на основе биома
-            switch (grid[i][j].biome) {
-                case WATER:
+                if (elevation < 0.3f) {
                     Labir[i][j] = 4; // Вода
-                    break;
-                case CAVE:
-                    Labir[i][j] = (grid[i][j].value == 0) ? 5 : 6; // Пещера
-                    break;
-                case MOUNTAIN:
-                    Labir[i][j] = (grid[i][j].value == 1) ? 7 : 0; // Горы
-                    break;
-                case DESERT:
-                    Labir[i][j] = (grid[i][j].value == 0) ? 8 : 9; // Пустыня
-                    break;
-                default:
-                    Labir[i][j] = grid[i][j].value; // Обычная земля
-            }
-        }
-    }
+                } else if (elevation > 0.7f) {
+                    Labir[i][j] = 7; // Горы
+                } else {
+                    Labir[i][j] = 0; // Земля
 
-    // Поиск точки спавна с улучшенной проверкой
-    vector<pair<int, int>> potentialSpawns;
-    for (int i = 8; i < n-8; i++) {
-        for (int j = 8; j < m-8; j++) {
-            if (isValidSpawnLocation(Labir, i, j, n, m)) {
-                int openSpace = 0;
-                for (int dx = -2; dx <= 2; dx++) {
-                    for (int dy = -2; dy <= 2; dy++) {
-                        if (inBounds(i+dx, j+dy, n, m) &&
-                           (Labir[i+dx][j+dy] == 0 || Labir[i+dx][j+dy] == 5 || Labir[i+dx][j+dy] == 8)) {
-                            openSpace++;
-                        }
-                    }
-                }
-                if (openSpace >= 8) {
-                    potentialSpawns.push_back(make_pair(i, j));
-                }
-            }
-        }
-    }
-
-    if (!potentialSpawns.empty()) {
-        auto spawn = potentialSpawns[rand() % potentialSpawns.size()];
-        spawnX = spawn.first;
-        spawnY = spawn.second;
-        Labir[spawnX][spawnY] = 2; // Точка спавна
-
-        // Дополнительная проверка: убедимся, что вокруг спавна нет стен
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dy = -1; dy <= 1; dy++) {
-                if (inBounds(spawnX+dx, spawnY+dy, n, m)) {
-                    int tile = Labir[spawnX+dx][spawnY+dy];
-                    if (tile == 1 || tile == 4 || tile == 6 || tile == 7 || tile == 9) {
-                        // Заменяем непроходимые тайлы вокруг спавна на землю
-                        Labir[spawnX+dx][spawnY+dy] = 0;
-                    }
+                    // Упрощенная растительность
+                    float moisture = generateMoisture(i, j, n, m, seed);
+                    float temperature = generateTemperature(i, j, n, m, seed);
+                    Biome biome = determineBiome(elevation, moisture, temperature, i, j, seed);
+                    generateVegetation(Labir, biome, i, j, seed);
                 }
             }
         }
     } else {
-        // Аварийный поиск: если не нашли подходящего места, ищем любую землю
-        for (int i = n/2-5; i <= n/2+5; i++) {
-            for (int j = m/2-5; j <= m/2+5; j++) {
-                if (inBounds(i, j, n, m) &&
-                   (Labir[i][j] == 0 || Labir[i][j] == 5 || Labir[i][j] == 8)) {
-                    spawnX = i;
-                    spawnY = j;
-                    Labir[i][j] = 2;
+        // Стандартная генерация для карт до 1000x1000
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < m; j++) {
+                float elevation = generateElevation(i, j, n, m, seed);
+                float moisture = generateMoisture(i, j, n, m, seed);
+                float temperature = generateTemperature(i, j, n, m, seed);
 
-                    // Очищаем область вокруг
-                    for (int dx = -2; dx <= 2; dx++) {
-                        for (int dy = -2; dy <= 2; dy++) {
-                            if (inBounds(i+dx, j+dy, n, m) &&
-                               (Labir[i+dx][j+dy] == 1 || Labir[i+dx][j+dy] == 4 ||
-                                Labir[i+dx][j+dy] == 6 || Labir[i+dx][j+dy] == 7 ||
-                                Labir[i+dx][j+dy] == 9)) {
-                                Labir[i+dx][j+dy] = 0;
-                            }
-                        }
-                    }
-                    // Выходим из функции после аварийного поиска
-                    return;
+                Biome biome = determineBiome(elevation, moisture, temperature, i, j, seed);
+
+                if (elevation < 0.2f) {
+                    Labir[i][j] = 4;
+                } else if (elevation > 0.8f) {
+                    Labir[i][j] = 7;
+                } else {
+                    Labir[i][j] = 0;
                 }
             }
         }
 
-        // Последний резерв: создаем безопасную зону в центре
+        // Растительность только для земли
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < m; j++) {
+                if (Labir[i][j] == 0) {
+                    float elevation = generateElevation(i, j, n, m, seed);
+                    float moisture = generateMoisture(i, j, n, m, seed);
+                    float temperature = generateTemperature(i, j, n, m, seed);
+                    Biome biome = determineBiome(elevation, moisture, temperature, i, j, seed);
+                    generateVegetation(Labir, biome, i, j, seed);
+                }
+            }
+        }
+    }
+
+    // Оптимизированный поиск спавна
+    vector<pair<int, int>> goodSpawns;
+
+    // Используем разреженный поиск для больших карт
+    int step = max(1, min(n, m) / 50);
+    for (int i = n/4; i < 3*n/4; i += step) {
+        for (int j = m/4; j < 3*m/4; j += step) {
+            if (Labir[i][j] == 0) {
+                goodSpawns.emplace_back(i, j);
+            }
+        }
+    }
+
+    // Если не нашли хороших позиций, ищем любую землю
+    if (goodSpawns.empty()) {
+        for (int i = 0; i < n && goodSpawns.size() < 10; i += max(1, n/10)) {
+            for (int j = 0; j < m && goodSpawns.size() < 10; j += max(1, m/10)) {
+                if (Labir[i][j] == 0) {
+                    goodSpawns.emplace_back(i, j);
+                }
+            }
+        }
+    }
+
+    // Выбираем точку спавна
+    if (!goodSpawns.empty()) {
+        auto [x, y] = goodSpawns[goodSpawns.size() / 2];
+        spawnX = x;
+        spawnY = y;
+    } else {
+        // Фолбэк: центр карты
         spawnX = n/2;
         spawnY = m/2;
-
-        // Создаем очищенную область 5x5
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dy = -2; dy <= 2; dy++) {
-                if (inBounds(spawnX+dx, spawnY+dy, n, m)) {
-                    Labir[spawnX+dx][spawnY+dy] = 0;
-                }
-            }
+        // Гарантируем, что в центре есть земля
+        if (spawnX < n && spawnY < m) {
+            Labir[spawnX][spawnY] = 0;
         }
+    }
+
+    if (spawnX < n && spawnY < m) {
         Labir[spawnX][spawnY] = 2;
     }
 
-    // Генерация точки выхода
-    int exitX, exitY;
-    int attempts = 0;
-    do {
-        exitX = 10 + rand() % (n-20);
-        exitY = 10 + rand() % (m-20);
-        attempts++;
-    } while ((abs(exitX - spawnX) + abs(exitY - spawnY) < min(n, m)/3) &&
-             attempts < 100 && Labir[exitX][exitY] != 0);
+    // Оптимизированный поиск выхода
+    int exitX = -1, exitY = -1;
+    float maxDist = -1;
 
-    if (attempts < 100 && inBounds(exitX, exitY, n, m) && Labir[exitX][exitY] == 0) {
-        Labir[exitX][exitY] = 3; // Точка выхода
-    } else {
-        // Резервное расположение
-        Labir[n-3][m-3] = 3;
+    // Используем разреженный поиск для больших карт
+    step = max(1, min(n, m) / 30);
+    for (int i = 0; i < n; i += step) {
+        for (int j = 0; j < m; j += step) {
+            if (Labir[i][j] == 0 && (i != spawnX || j != spawnY)) {
+                float dist = sqrt(pow(i - spawnX, 2) + pow(j - spawnY, 2));
+                if (dist > maxDist) {
+                    maxDist = dist;
+                    exitX = i;
+                    exitY = j;
+                }
+            }
+        }
     }
 
-    // Гарантируем, что спавн и выход соединены
-    int curX = spawnX, curY = spawnY;
-    int targetX = exitX, targetY = exitY;
-
-    while (abs(curX - targetX) > 1 || abs(curY - targetY) > 1) {
-        if (curX < targetX) curX++;
-        else if (curX > targetX) curX--;
-        if (curY < targetY) curY++;
-        else if (curY > targetY) curY--;
-
-        if (inBounds(curX, curY, n, m) && Labir[curX][curY] != 0 && Labir[curX][curY] != 2 && Labir[curX][curY] != 3) {
-            Labir[curX][curY] = 0;
+    // Если не нашли разреженно, ищем подробно но в ограниченной области
+    if (exitX == -1) {
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < m; j++) {
+                if (Labir[i][j] == 0 && (i != spawnX || j != spawnY)) {
+                    float dist = sqrt(pow(i - spawnX, 2) + pow(j - spawnY, 2));
+                    if (dist > maxDist) {
+                        maxDist = dist;
+                        exitX = i;
+                        exitY = j;
+                    }
+                }
+            }
         }
+    }
+
+    // Финальный фолбэк
+    if (exitX == -1) {
+        exitX = (spawnX == 0 && n > 1) ? n-1 : 0;
+        exitY = (spawnY == 0 && m > 1) ? m-1 : 0;
+    }
+
+    if (exitX < n && exitY < m) {
+        Labir[exitX][exitY] = 3;
     }
 }
 
-#endif // GENERATOR_H_INCLUDED
+#endif //GENERATOR_H_INCLUDED

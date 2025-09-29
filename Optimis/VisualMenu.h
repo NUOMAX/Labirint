@@ -1,18 +1,20 @@
-#include <iostream>
-#include <cstdlib>
-#include <conio.h>
-#include <windows.h>
-#include <vector>
-#include <queue>
-#include <cmath>
-#include <functional>
-#include <string>
-#include <sstream>
-#include <chrono>
-#include "generator.h"
-#include "VisualMaping.h"
+#ifndef VISUALMENU_H_INCLUDED
+#define VISUALMENU_H_INCLUDED
 
-using namespace std;
+// Функция для установки полноэкранного режима без рамки
+void SetFullscreenNoBorder() {
+    HWND hConsole = GetConsoleWindow();
+
+    // Получаем размеры экрана
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    // Убираем рамку и заголовок
+    SetWindowLong(hConsole, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+
+    // Устанавливаем на весь экран
+    SetWindowPos(hConsole, HWND_TOP, 0, 0, screenWidth, screenHeight, SWP_SHOWWINDOW);
+}
 
 class OptimizedMenu {
 private:
@@ -86,11 +88,11 @@ public:
         inputSeed = to_wstring(time(NULL));
 
         menuItems = {
-            L"\u041D\u041E\u0412\u0410\u042F \u0418\u0413\u0420\u0410", // НОВАЯ ИГРА
-            L"\u041D\u0410\u0421\u0422\u0420\u041E\u0419\u041A\u0418", // НАСТРОЙКИ
-            L"\u0420\u0415\u041A\u041E\u0420\u0414\u042B", // РЕКОРДЫ
-            L"\u041E\u0411 \u0410\u0412\u0422\u041E\u0420\u0415", // ОБ АВТОРЕ
-            L"\u0412\u042B\u0425\u041E\u0414" // ВЫХОД
+            L"\u041D\u041E\u0412\u0410\u042F \u0418\u0413\u0420\u0410",
+            L"\u041D\u0410\u0421\u0422\u0420\u041E\u0419\u041A\u0418",
+            L"\u0420\u0415\u041A\u041E\u0420\u0414\u042B",
+            L"\u041E\u0411 \u0410\u0412\u0422\u041E\u0420\u0415",
+            L"\u0412\u042B\u0425\u041E\u0414"
         };
 
         lastInputTime = 0;
@@ -137,14 +139,14 @@ public:
         const int PARTICLE_COUNT = 25;
 
         for (int i = 0; i < PARTICLE_COUNT; i++) {
-            int x = (animationFrame * 3 + i * 67) % width;
-            int y = height / 4 + sin(animationFrame * 0.08 + i * 0.7) * 80;
+            int x = (animationFrame * 1 + i * 67) % width;
+            int y = height / 4 + sin(animationFrame * 0.03 + i * 0.7) * 80;
             int size = 3 + (i % 2);
 
             COLORREF color = RGB(
-                100 + sin(animationFrame * 0.1 + i) * 100,
-                80 + cos(animationFrame * 0.07 + i * 1.5) * 80,
-                150 + sin(animationFrame * 0.12 + i * 2) * 100
+                100 + sin(animationFrame * 0.05 + i) * 100,
+                80 + cos(animationFrame * 0.03 + i * 1.5) * 80,
+                150 + sin(animationFrame * 0.06 + i * 2) * 100
             );
 
             HBRUSH particleBrush = CreateSolidBrush(color);
@@ -161,15 +163,15 @@ public:
         }
 
         for (int i = 0; i < 6; i++) {
-            int x1 = (animationFrame * 4 + i * 120) % width;
-            int y1 = height / 3 + cos(animationFrame * 0.05 + i) * 100;
-            int x2 = x1 + 50 + sin(animationFrame * 0.1 + i) * 30;
-            int y2 = y1 + 30 + cos(animationFrame * 0.08 + i) * 40;
+            int x1 = (animationFrame * 2 + i * 120) % width;
+            int y1 = height / 3 + cos(animationFrame * 0.02 + i) * 100;
+            int x2 = x1 + 50 + sin(animationFrame * 0.05 + i) * 30;
+            int y2 = y1 + 30 + cos(animationFrame * 0.04 + i) * 40;
 
             COLORREF color = RGB(
-                150 + sin(animationFrame * 0.15 + i) * 105,
-                120 + cos(animationFrame * 0.12 + i) * 135,
-                200 + sin(animationFrame * 0.18 + i * 3) * 55
+                150 + sin(animationFrame * 0.08 + i) * 105,
+                120 + cos(animationFrame * 0.06 + i) * 135,
+                200 + sin(animationFrame * 0.09 + i * 3) * 55
             );
 
             HPEN linePen = CreatePen(PS_SOLID, 2, color);
@@ -184,18 +186,18 @@ public:
     }
 
     void DrawAnimatedTitle() {
-        wstring title = L"\u041B\u0410\u0411\u0418\u0420\u0418\u041D\u0422"; // ЛАБИРИНТ
+        wstring title = L"\u041B\u0410\u0411\u0418\u0420\u0418\u041D\u0422";
         int titleWidth = title.length() * 45;
         int titleX = (width - titleWidth) / 2;
         int titleY = 60;
 
         for (size_t i = 0; i < title.length(); i++) {
             int charX = titleX + i * 55;
-            int charY = titleY + sin(animationFrame * 0.12 + i * 1.2) * 15;
+            int charY = titleY + sin(animationFrame * 0.06 + i * 1.2) * 15;
 
             COLORREF color = RGB(
                 255,
-                150 + cos(animationFrame * 0.09 + i) * 105,
+                150 + cos(animationFrame * 0.05 + i) * 105,
                 50 + sin(animationFrame * 0.08 + i * 2) * 205
             );
 
@@ -210,7 +212,7 @@ public:
 
         bool isSelected = (index == selectedItem);
 
-        float pulse = (sin(animationFrame * 0.15f) + 1) * 0.4f;
+        float pulse = (sin(animationFrame * 0.08f) + 1) * 0.4f;
 
         int textWidth = 350;
         int textHeight = 55;
@@ -255,8 +257,8 @@ public:
         DrawText(textX + 30, itemY + 8, menuItem, textColor);
 
         if (isSelected && (animationFrame % 20 < 12)) {
-            DrawText(centerX - 200, itemY + 8, L">>", RGB(255, 255, 0));
-            DrawText(centerX + 182, itemY + 8, L"<<", RGB(255, 255, 0));
+            DrawText(centerX - 200, itemY + 8, L"\u00BB", RGB(255, 255, 0));
+            DrawText(centerX + 182, itemY + 8, L"\u00AB", RGB(255, 255, 0));
         }
     }
 
@@ -307,7 +309,7 @@ public:
         SelectObject(hdcBuffer, oldBrush);
         DeleteObject(borderPen);
 
-        wstring title = L"\u0421\u041E\u0417\u0414\u0410\u041D\u0418\u0415 \u041D\u041E\u0412\u041E\u0419 \u0418\u0413\u0420\u042B"; // СОЗДАНИЕ НОВОЙ ИГРЫ
+        wstring title = L"\u0421\u041E\u0417\u0414\u0410\u041D\u0418\u0415 \u041D\u041E\u0412\u041E\u0419 \u0418\u0413\u0420\u042B";
         int titleWidth = title.length() * 20;
         int titleX = menuX + (menuWidth - titleWidth) / 2;
         DrawText(titleX, menuY + 30, title, RGB(255, 255, 200));
@@ -338,7 +340,8 @@ public:
             L"\u0426\u0418\u0424\u0420\u042B - \u0432\u0432\u043E\u0434 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0439",
             L"BACKSPACE - \u0443\u0434\u0430\u043B\u0435\u043D\u0438\u0435 \u0441\u0438\u043C\u0432\u043E\u043B\u0430",
             L"ENTER - \u0432\u044B\u0431\u043E\u0440 \u043F\u043E\u043B\u044F/\u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435",
-            L"ESC - \u043E\u0442\u043C\u0435\u043D\u0430"
+            L"ESC - \u043E\u0442\u043C\u0435\u043D\u0430",
+            L"\u041C\u0430\u043A\u0441. \u0440\u0430\u0437\u043C\u0435\u0440: 250x250"
         };
 
         int instY = menuY + 280;
@@ -501,10 +504,12 @@ public:
             m = stoi(inputM);
             SEED = stoll(inputSeed);
 
+            // Только минимальные ограничения
             if (n < 5) n = 5;
             if (m < 5) m = 5;
-            if (n > 100) n = 100;
-            if (m > 100) m = 100;
+            // Максимальные ограничения убраны
+            // if (n > 100) n = 100;
+            // if (m > 100) m = 100;
 
             return true;
         } catch (...) {
@@ -601,34 +606,4 @@ void ShowAbout(OptimizedMenu& menu) {
     // Заглушка для информации
 }
 
-int main()
-{
-    HWND HConsole = GetConsoleWindow();
-    ShowWindow(HConsole, SW_MAXIMIZE);
-    SetConsole();
-
-    OptimizedMenu menu;
-
-    while (true) {
-        int choice = menu.RunMenu();
-
-        switch (choice) {
-            case 0: // НОВАЯ ИГРА
-                StartNewGame(menu);
-                break;
-            case 1: // НАСТРОЙКИ
-                ShowSettings(menu);
-                break;
-            case 2: // РЕКОРДЫ
-                ShowRecords(menu);
-                break;
-            case 3: // ОБ АВТОРЕ
-                ShowAbout(menu);
-                break;
-            case 4: // ВЫХОД
-                return 0;
-        }
-    }
-
-    return 0;
-}
+#endif // VISUALMENU_H_INCLUDED
